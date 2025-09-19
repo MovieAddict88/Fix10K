@@ -10,13 +10,14 @@ public class EntryWithDetails {
     public EntryEntity entry;
 
     @Relation(
-        entity = SeasonEntity.class,
+        entity = ServerEntity.class,
         parentColumn = "id",
         entityColumn = "entryId"
     )
     public List<ServerEntity> servers;
 
     @Relation(
+        entity = SeasonEntity.class,
         parentColumn = "id",
         entityColumn = "entryId"
     )
