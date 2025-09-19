@@ -23,6 +23,8 @@ import com.cinecraze.free.database.CineCrazeDatabase;
 import com.cinecraze.free.database.entities.DownloadItemEntity;
 
 import java.util.ArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.List;
 
 public class DownloadsFragment extends Fragment {
@@ -30,11 +32,18 @@ public class DownloadsFragment extends Fragment {
     private RecyclerView recyclerView;
     private DownloadsListAdapter adapter;
     private Handler handler;
+    private ExecutorService databaseExecutor;
     private final Runnable poller = new Runnable() {
         @Override public void run() { refreshStatuses(); handler.postDelayed(this, 1000); }
     };
 
     public static DownloadsFragment newInstance() { return new DownloadsFragment(); }
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        databaseExecutor = Executors.newSingleThreadExecutor();
+    }
 
     @Nullable
     @Override
@@ -55,34 +64,48 @@ public class DownloadsFragment extends Fragment {
     @Override public void onResume() { super.onResume(); loadItems(); handler.post(poller); }
     @Override public void onPause() { super.onPause(); handler.removeCallbacks(poller); }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        databaseExecutor.shutdown();
+    }
+
     private void loadItems() {
-        List<DownloadItemEntity> items = CineCrazeDatabase.getInstance(getContext()).downloadItemDao().getAll();
-        adapter.setItems(items);
+        databaseExecutor.execute(() -> {
+            List<DownloadItemEntity> items = CineCrazeDatabase.getInstance(getContext()).downloadItemDao().getAll();
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> adapter.setItems(items));
+            }
+        });
     }
 
     private void refreshStatuses() {
         Context ctx = getContext();
         if (ctx == null) return;
-        List<DownloadItemEntity> items = CineCrazeDatabase.getInstance(ctx).downloadItemDao().getAll();
-        DownloadManager dm = (DownloadManager) ctx.getSystemService(Context.DOWNLOAD_SERVICE);
-        for (DownloadItemEntity item : items) {
-            DownloadManager.Query q = new DownloadManager.Query().setFilterById(item.downloadManagerId);
-            try (Cursor c = dm.query(q)) {
-                if (c != null && c.moveToFirst()) {
-                    int bytesIdx = c.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
-                    int totalIdx = c.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
-                    int statusIdx = c.getColumnIndex(DownloadManager.COLUMN_STATUS);
-                    int localUriIdx = c.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI);
-                    item.downloadedBytes = bytesIdx >= 0 ? c.getLong(bytesIdx) : 0L;
-                    item.totalBytes = totalIdx >= 0 ? c.getLong(totalIdx) : 0L;
-                    item.status = statusIdx >= 0 ? c.getInt(statusIdx) : item.status;
-                    if (localUriIdx >= 0) item.localUri = c.getString(localUriIdx);
-                    item.updatedAt = System.currentTimeMillis();
-                    CineCrazeDatabase.getInstance(ctx).downloadItemDao().update(item);
-                }
-            } catch (Exception ignored) {}
-        }
-        adapter.setItems(items);
+        databaseExecutor.execute(() -> {
+            List<DownloadItemEntity> items = CineCrazeDatabase.getInstance(ctx).downloadItemDao().getAll();
+            DownloadManager dm = (DownloadManager) ctx.getSystemService(Context.DOWNLOAD_SERVICE);
+            for (DownloadItemEntity item : items) {
+                DownloadManager.Query q = new DownloadManager.Query().setFilterById(item.downloadManagerId);
+                try (Cursor c = dm.query(q)) {
+                    if (c != null && c.moveToFirst()) {
+                        int bytesIdx = c.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR);
+                        int totalIdx = c.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES);
+                        int statusIdx = c.getColumnIndex(DownloadManager.COLUMN_STATUS);
+                        int localUriIdx = c.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI);
+                        item.downloadedBytes = bytesIdx >= 0 ? c.getLong(bytesIdx) : 0L;
+                        item.totalBytes = totalIdx >= 0 ? c.getLong(totalIdx) : 0L;
+                        item.status = statusIdx >= 0 ? c.getInt(statusIdx) : item.status;
+                        if (localUriIdx >= 0) item.localUri = c.getString(localUriIdx);
+                        item.updatedAt = System.currentTimeMillis();
+                        CineCrazeDatabase.getInstance(ctx).downloadItemDao().update(item);
+                    }
+                } catch (Exception ignored) {}
+            }
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> adapter.setItems(items));
+            }
+        });
     }
 
     private static class DownloadsListAdapter extends RecyclerView.Adapter<DownloadsListAdapter.Holder> {

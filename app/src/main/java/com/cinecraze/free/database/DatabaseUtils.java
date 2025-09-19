@@ -1,7 +1,13 @@
 package com.cinecraze.free.database;
 
 import com.cinecraze.free.database.entities.EntryEntity;
+import com.cinecraze.free.database.entities.EntryWithDetails;
+import com.cinecraze.free.database.entities.EpisodeEntity;
+import com.cinecraze.free.database.entities.SeasonEntity;
+import com.cinecraze.free.database.entities.SeasonWithEpisodes;
+import com.cinecraze.free.database.entities.ServerEntity;
 import com.cinecraze.free.models.Entry;
+import com.cinecraze.free.models.Episode;
 import com.cinecraze.free.models.Server;
 import com.cinecraze.free.models.Season;
 import com.google.gson.Gson;
@@ -33,8 +39,6 @@ public class DatabaseUtils {
         entity.setMainCategory(mainCategory);
         
         // Convert complex objects to JSON strings
-        entity.setServersJson(gson.toJson(entry.getServers()));
-        entity.setSeasonsJson(gson.toJson(entry.getSeasons()));
         entity.setRelatedJson(gson.toJson(entry.getRelated()));
         
         return entity;
@@ -43,8 +47,9 @@ public class DatabaseUtils {
     /**
      * Convert EntryEntity database entity to Entry API model
      */
-    public static Entry entityToEntry(EntryEntity entity) {
+    public static Entry entryWithDetailsToEntry(EntryWithDetails entryWithDetails) {
         Entry entry = new Entry();
+        EntryEntity entity = entryWithDetails.entry;
         
         // Use proper setter methods
         entry.setTitle(entity.getTitle());
@@ -58,23 +63,53 @@ public class DatabaseUtils {
         entry.setDuration(entity.getDuration());
         entry.setYear(entity.getYear());
         
-        // Convert JSON strings back to objects
-        try {
-            Type serverListType = new TypeToken<List<Server>>(){}.getType();
-            List<Server> servers = gson.fromJson(entity.getServersJson(), serverListType);
+        // Convert servers
+        if (entryWithDetails.servers != null) {
+            List<Server> servers = new ArrayList<>();
+            for (ServerEntity serverEntity : entryWithDetails.servers) {
+                Server server = new Server();
+                server.setName(serverEntity.name);
+                server.setUrl(serverEntity.url);
+                server.setQuality(serverEntity.quality);
+                servers.add(server);
+            }
             entry.setServers(servers);
-            
-            Type seasonListType = new TypeToken<List<Season>>(){}.getType();
-            List<Season> seasons = gson.fromJson(entity.getSeasonsJson(), seasonListType);
+        }
+
+        // Convert seasons
+        if (entryWithDetails.seasons != null) {
+            List<Season> seasons = new ArrayList<>();
+            for (SeasonWithEpisodes seasonWithEpisodes : entryWithDetails.seasons) {
+                Season season = new Season();
+                SeasonEntity seasonEntity = seasonWithEpisodes.season;
+                season.setName(seasonEntity.name);
+                season.setSeasonNumber(seasonEntity.seasonNumber);
+
+                if (seasonWithEpisodes.episodes != null) {
+                    List<Episode> episodes = new ArrayList<>();
+                    for (EpisodeEntity episodeEntity : seasonWithEpisodes.episodes) {
+                        Episode episode = new Episode();
+                        episode.setTitle(episodeEntity.title);
+                        episode.setEpisodeNumber(episodeEntity.episodeNumber);
+                        episode.setThumbnail(episodeEntity.thumbnail);
+
+                        Type serverListType = new TypeToken<List<Server>>(){}.getType();
+                        List<Server> episodeServers = gson.fromJson(episodeEntity.serversJson, serverListType);
+                        episode.setServers(episodeServers);
+                        episodes.add(episode);
+                    }
+                    season.setEpisodes(episodes);
+                }
+                seasons.add(season);
+            }
             entry.setSeasons(seasons);
-            
+        }
+
+        try {
             Type entryListType = new TypeToken<List<Entry>>(){}.getType();
             List<Entry> related = gson.fromJson(entity.getRelatedJson(), entryListType);
             entry.setRelated(related);
         } catch (Exception e) {
-            // Handle JSON parsing errors gracefully
-            entry.setServers(new ArrayList<>());
-            entry.setSeasons(new ArrayList<>());
             entry.setRelated(new ArrayList<>());
         }
         
@@ -84,10 +119,10 @@ public class DatabaseUtils {
     /**
      * Convert list of EntryEntity to list of Entry
      */
-    public static List<Entry> entitiesToEntries(List<EntryEntity> entities) {
+    public static List<Entry> entitiesToEntries(List<EntryWithDetails> entriesWithDetails) {
         List<Entry> entries = new ArrayList<>();
-        for (EntryEntity entity : entities) {
-            entries.add(entityToEntry(entity));
+        for (EntryWithDetails entryWithDetails : entriesWithDetails) {
+            entries.add(entryWithDetailsToEntry(entryWithDetails));
         }
         return entries;
     }

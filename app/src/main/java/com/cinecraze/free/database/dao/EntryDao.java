@@ -4,8 +4,10 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
+import androidx.room.Transaction;
 
 import com.cinecraze.free.database.entities.EntryEntity;
+import com.cinecraze.free.database.entities.EntryWithDetails;
 
 import java.util.List;
 
@@ -13,19 +15,19 @@ import java.util.List;
 public interface EntryDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insertAll(List<EntryEntity> entries);
+    long insert(EntryEntity entry);
     
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insert(EntryEntity entry);
-    
+    @Transaction
     @Query("SELECT * FROM entries")
-    List<EntryEntity> getAllEntries();
+    List<EntryWithDetails> getAllEntries();
     
+    @Transaction
     @Query("SELECT * FROM entries WHERE main_category = :category")
-    List<EntryEntity> getEntriesByCategory(String category);
+    List<EntryWithDetails> getEntriesByCategory(String category);
     
+    @Transaction
     @Query("SELECT * FROM entries WHERE title LIKE '%' || :title || '%'")
-    List<EntryEntity> searchByTitle(String title);
+    List<EntryWithDetails> searchByTitle(String title);
     
     @Query("SELECT COUNT(*) FROM entries")
     int getEntriesCount();
@@ -37,14 +39,17 @@ public interface EntryDao {
     void deleteByCategory(String category);
     
     // Pagination queries
+    @Transaction
     @Query("SELECT * FROM entries ORDER BY title ASC LIMIT :limit OFFSET :offset")
-    List<EntryEntity> getEntriesPaged(int limit, int offset);
+    List<EntryWithDetails> getEntriesPaged(int limit, int offset);
     
+    @Transaction
     @Query("SELECT * FROM entries WHERE main_category = :category ORDER BY title ASC LIMIT :limit OFFSET :offset")
-    List<EntryEntity> getEntriesByCategoryPaged(String category, int limit, int offset);
+    List<EntryWithDetails> getEntriesByCategoryPaged(String category, int limit, int offset);
     
+    @Transaction
     @Query("SELECT * FROM entries WHERE title LIKE '%' || :title || '%' ORDER BY title ASC LIMIT :limit OFFSET :offset")
-    List<EntryEntity> searchByTitlePaged(String title, int limit, int offset);
+    List<EntryWithDetails> searchByTitlePaged(String title, int limit, int offset);
     
     @Query("SELECT COUNT(*) FROM entries WHERE main_category = :category")
     int getEntriesCountByCategory(String category);
@@ -63,12 +68,13 @@ public interface EntryDao {
     List<String> getUniqueYears();
     
     // Filtered pagination queries
+    @Transaction
     @Query("SELECT * FROM entries WHERE " +
            "(:genre IS NULL OR sub_category = :genre) AND " +
            "(:country IS NULL OR country = :country) AND " +
            "(:year IS NULL OR year = :year) " +
            "ORDER BY title ASC LIMIT :limit OFFSET :offset")
-    List<EntryEntity> getEntriesFilteredPaged(String genre, String country, String year, int limit, int offset);
+    List<EntryWithDetails> getEntriesFilteredPaged(String genre, String country, String year, int limit, int offset);
     
     @Query("SELECT COUNT(*) FROM entries WHERE " +
            "(:genre IS NULL OR sub_category = :genre) AND " +
@@ -76,6 +82,11 @@ public interface EntryDao {
            "(:year IS NULL OR year = :year)")
     int getEntriesFilteredCount(String genre, String country, String year);
 
+    @Transaction
     @Query("SELECT * FROM entries ORDER BY CAST(rating AS REAL) DESC LIMIT :count")
-    List<EntryEntity> getTopRatedEntries(int count);
+    List<EntryWithDetails> getTopRatedEntries(int count);
+
+    @Transaction
+    @Query("SELECT * FROM entries WHERE id = :id")
+    EntryWithDetails getEntryWithDetails(int id);
 }

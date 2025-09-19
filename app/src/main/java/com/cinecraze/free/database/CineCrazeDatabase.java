@@ -8,12 +8,19 @@ import androidx.room.RoomDatabase;
 
 import com.cinecraze.free.database.dao.EntryDao;
 import com.cinecraze.free.database.dao.CacheMetadataDao;
+import com.cinecraze.free.database.dao.DownloadItemDao;
+import com.cinecraze.free.database.dao.ServerDao;
+import com.cinecraze.free.database.dao.SeasonDao;
+import com.cinecraze.free.database.dao.EpisodeDao;
 import com.cinecraze.free.database.entities.EntryEntity;
 import com.cinecraze.free.database.entities.CacheMetadataEntity;
+import com.cinecraze.free.database.entities.ServerEntity;
+import com.cinecraze.free.database.entities.SeasonEntity;
+import com.cinecraze.free.database.entities.EpisodeEntity;
 
 @Database(
-    entities = {EntryEntity.class, CacheMetadataEntity.class, com.cinecraze.free.database.entities.DownloadItemEntity.class},
-    version = 2,
+    entities = {EntryEntity.class, CacheMetadataEntity.class, com.cinecraze.free.database.entities.DownloadItemEntity.class, ServerEntity.class, SeasonEntity.class, EpisodeEntity.class},
+    version = 3,
     exportSchema = false
 )
 public abstract class CineCrazeDatabase extends RoomDatabase {
@@ -23,7 +30,10 @@ public abstract class CineCrazeDatabase extends RoomDatabase {
     
     public abstract EntryDao entryDao();
     public abstract CacheMetadataDao cacheMetadataDao();
-    public abstract com.cinecraze.free.database.dao.DownloadItemDao downloadItemDao();
+    public abstract DownloadItemDao downloadItemDao();
+    public abstract ServerDao serverDao();
+    public abstract SeasonDao seasonDao();
+    public abstract EpisodeDao episodeDao();
     
     public static synchronized CineCrazeDatabase getInstance(Context context) {
         if (instance == null) {
@@ -33,7 +43,6 @@ public abstract class CineCrazeDatabase extends RoomDatabase {
                 DATABASE_NAME
             )
             .fallbackToDestructiveMigration()
-            .allowMainThreadQueries() // For simplicity, but ideally use background threads
             .build();
         }
         return instance;
