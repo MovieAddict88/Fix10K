@@ -10,6 +10,7 @@ public class EntryWithDetails {
     public EntryEntity entry;
 
     @Relation(
+        entity = SeasonEntity.class,
         parentColumn = "id",
         entityColumn = "entryId"
     )

@@ -2,13 +2,15 @@ package com.cinecraze.free.database.entities;
 
 import androidx.room.Entity;
 import androidx.room.ForeignKey;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
 @Entity(tableName = "episodes",
         foreignKeys = @ForeignKey(entity = SeasonEntity.class,
                                   parentColumns = "id",
                                   childColumns = "seasonId",
-                                  onDelete = ForeignKey.CASCADE))
+                                  onDelete = ForeignKey.CASCADE),
+        indices = {@Index("seasonId")})
 public class EpisodeEntity {
     @PrimaryKey(autoGenerate = true)
     public int id;
