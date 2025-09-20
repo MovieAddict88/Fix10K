@@ -444,73 +444,99 @@ public class DataRepository {
      * Cache the playlist data to local database
      */
     private void cachePlaylists(List<Playlist> playlists, int version) {
+        // Helper class to hold an entry and its main category
+        class EntryWithCategory {
+            final Entry entry;
+            final String mainCategory;
+
+            EntryWithCategory(Entry entry, String mainCategory) {
+                this.entry = entry;
+                this.mainCategory = mainCategory;
+            }
+        }
+
         database.runInTransaction(() -> {
-            // Clear existing data
+            // Clear existing data more safely
             database.serverDao().deleteAll();
             database.episodeDao().deleteAll();
             database.seasonDao().deleteAll();
             database.entryDao().deleteAll();
+        });
 
-            Set<Integer> entryIds = new HashSet<>();
-            int entryCount = 0;
 
-            for (Playlist playlist : playlists) {
-                if (playlist.getCategories() != null) {
-                    for (Category category : playlist.getCategories()) {
-                        if (category != null && category.getEntries() != null) {
-                            String mainCategory = category.getMainCategory();
-                            for (Entry entry : category.getEntries()) {
-                                if (entry != null && entryIds.add(entry.getId())) {
-                                    EntryEntity entryEntity = DatabaseUtils.entryToEntity(entry, mainCategory);
-                                    long entryId = database.entryDao().insertAndGetId(entryEntity);
-                                    entryCount++;
+        Set<Integer> entryIds = new HashSet<>();
+        List<EntryWithCategory> entriesToCache = new ArrayList<>();
+        for (Playlist playlist : playlists) {
+            if (playlist.getCategories() != null) {
+                for (Category category : playlist.getCategories()) {
+                    if (category != null && category.getEntries() != null) {
+                        String mainCategory = category.getMainCategory();
+                        for (Entry entry : category.getEntries()) {
+                            if (entry != null && entryIds.add(entry.getId())) {
+                                entriesToCache.add(new EntryWithCategory(entry, mainCategory));
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-                                    // Insert servers for the entry (movie)
-                                    if (entry.getServers() != null) {
-                                        for (com.cinecraze.free.models.Server server : entry.getServers()) {
+        int batchSize = 1000;
+        int totalEntries = entriesToCache.size();
+        for (int i = 0; i < totalEntries; i += batchSize) {
+            int end = Math.min(i + batchSize, totalEntries);
+            List<EntryWithCategory> batch = entriesToCache.subList(i, end);
+
+            database.runInTransaction(() -> {
+                for (EntryWithCategory item : batch) {
+                    Entry entry = item.entry;
+                    String mainCategory = item.mainCategory;
+
+                    EntryEntity entryEntity = DatabaseUtils.entryToEntity(entry, mainCategory);
+                    long entryId = database.entryDao().insertAndGetId(entryEntity);
+
+                    // Insert servers for the entry (movie)
+                    if (entry.getServers() != null) {
+                        for (com.cinecraze.free.models.Server server : entry.getServers()) {
+                            ServerEntity serverEntity = new ServerEntity();
+                            serverEntity.setName(server.getName());
+                            serverEntity.setUrl(server.getUrl());
+                            serverEntity.setLicense(server.getLicense());
+                            serverEntity.setDrm(server.isDrmProtected());
+                            serverEntity.setEntryId((int) entryId);
+                            database.serverDao().insert(serverEntity);
+                        }
+                    }
+
+                    // Insert seasons and episodes for the entry (series)
+                    if (entry.getSeasons() != null) {
+                        for (com.cinecraze.free.models.Season season : entry.getSeasons()) {
+                            SeasonEntity seasonEntity = new SeasonEntity();
+                            seasonEntity.setSeasonNumber(season.getSeason());
+                            seasonEntity.setSeasonPoster(season.getSeasonPoster());
+                            seasonEntity.setEntryId((int) entryId);
+                            long seasonId = database.seasonDao().insertAndGetId(seasonEntity);
+
+                            if (season.getEpisodes() != null) {
+                                for (com.cinecraze.free.models.Episode episode : season.getEpisodes()) {
+                                    EpisodeEntity episodeEntity = new EpisodeEntity();
+                                    episodeEntity.setEpisodeNumber(episode.getEpisode());
+                                    episodeEntity.setTitle(episode.getTitle());
+                                    episodeEntity.setDuration(episode.getDuration());
+                                    episodeEntity.setDescription(episode.getDescription());
+                                    episodeEntity.setThumbnail(episode.getThumbnail());
+                                    episodeEntity.setSeasonId((int) seasonId);
+                                    long episodeId = database.episodeDao().insertAndGetId(episodeEntity);
+
+                                    if (episode.getServers() != null) {
+                                        for (com.cinecraze.free.models.Server server : episode.getServers()) {
                                             ServerEntity serverEntity = new ServerEntity();
                                             serverEntity.setName(server.getName());
                                             serverEntity.setUrl(server.getUrl());
                                             serverEntity.setLicense(server.getLicense());
                                             serverEntity.setDrm(server.isDrmProtected());
-                                            serverEntity.setEntryId((int) entryId);
+                                            serverEntity.setEpisodeId((int) episodeId);
                                             database.serverDao().insert(serverEntity);
-                                        }
-                                    }
-
-                                    // Insert seasons and episodes for the entry (series)
-                                    if (entry.getSeasons() != null) {
-                                        for (com.cinecraze.free.models.Season season : entry.getSeasons()) {
-                                            SeasonEntity seasonEntity = new SeasonEntity();
-                                            seasonEntity.setSeasonNumber(season.getSeason());
-                                            seasonEntity.setSeasonPoster(season.getSeasonPoster());
-                                            seasonEntity.setEntryId((int) entryId);
-                                            long seasonId = database.seasonDao().insertAndGetId(seasonEntity);
-
-                                            if (season.getEpisodes() != null) {
-                                                for (com.cinecraze.free.models.Episode episode : season.getEpisodes()) {
-                                                    EpisodeEntity episodeEntity = new EpisodeEntity();
-                                                    episodeEntity.setEpisodeNumber(episode.getEpisode());
-                                                    episodeEntity.setTitle(episode.getTitle());
-                                                    episodeEntity.setDuration(episode.getDuration());
-                                                    episodeEntity.setDescription(episode.getDescription());
-                                                    episodeEntity.setThumbnail(episode.getThumbnail());
-                                                    episodeEntity.setSeasonId((int) seasonId);
-                                                    long episodeId = database.episodeDao().insertAndGetId(episodeEntity);
-
-                                                    if (episode.getServers() != null) {
-                                                        for (com.cinecraze.free.models.Server server : episode.getServers()) {
-                                                            ServerEntity serverEntity = new ServerEntity();
-                                                            serverEntity.setName(server.getName());
-                                                            serverEntity.setUrl(server.getUrl());
-                                                            serverEntity.setLicense(server.getLicense());
-                                                            serverEntity.setDrm(server.isDrmProtected());
-                                                            serverEntity.setEpisodeId((int) episodeId);
-                                                            database.serverDao().insert(serverEntity);
-                                                        }
-                                                    }
-                                                }
-                                            }
                                         }
                                     }
                                 }
@@ -518,16 +544,17 @@ public class DataRepository {
                         }
                     }
                 }
-            }
+            });
+            Log.d(TAG, "Cached batch of " + batch.size() + " entries. " + (i + batch.size()) + "/" + totalEntries);
+        }
 
-            CacheMetadataEntity metadata = new CacheMetadataEntity(
-                    CACHE_KEY_PLAYLIST_VERSION,
-                    System.currentTimeMillis(),
-                    String.valueOf(version)
-            );
-            database.cacheMetadataDao().insert(metadata);
+        CacheMetadataEntity metadata = new CacheMetadataEntity(
+                CACHE_KEY_PLAYLIST_VERSION,
+                System.currentTimeMillis(),
+                String.valueOf(version)
+        );
+        database.cacheMetadataDao().insert(metadata);
 
-            Log.d(TAG, "Data cached successfully: " + entryCount + " entries");
-        });
+        Log.d(TAG, "Data cached successfully: " + totalEntries + " entries");
     }
 }
