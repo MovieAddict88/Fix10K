@@ -545,7 +545,9 @@ public class PaginatedMainActivity extends AppCompatActivity implements Paginate
                     // After refresh, load only first page - don't return all data
                     loadFirstPage();
                     setupCarouselFromCache();
-                    Toast.makeText(PaginatedMainActivity.this, "Data refreshed (" + dataRepository.getTotalEntriesCount() + " items)", Toast.LENGTH_SHORT).show();
+                    dataRepository.getTotalEntriesCount(count ->
+                        Toast.makeText(PaginatedMainActivity.this, "Data refreshed (" + count + " items)", Toast.LENGTH_SHORT).show()
+                    );
                 }
 
                 @Override

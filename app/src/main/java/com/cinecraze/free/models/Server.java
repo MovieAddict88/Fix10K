@@ -10,6 +10,9 @@ public class Server {
     @SerializedName("url")
     private String url;
 
+    @SerializedName("quality")
+    private String quality;
+
     @SerializedName("license")
     private String license;
 
@@ -30,6 +33,14 @@ public class Server {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public String getQuality() {
+        return quality;
+    }
+
+    public void setQuality(String quality) {
+        this.quality = quality;
     }
 
     public String getLicense() {

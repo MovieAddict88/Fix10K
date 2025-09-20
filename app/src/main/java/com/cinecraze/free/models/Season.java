@@ -6,8 +6,11 @@ import java.util.List;
 
 public class Season {
 
-    @SerializedName("Season")
-    private int season;
+    @SerializedName("name")
+    private String name;
+
+    @SerializedName("season_number")
+    private int seasonNumber;
 
     @SerializedName("SeasonPoster")
     private String seasonPoster;
@@ -15,12 +18,20 @@ public class Season {
     @SerializedName("Episodes")
     private List<Episode> episodes;
 
-    public int getSeason() {
-        return season;
+    public String getName() {
+        return name;
     }
 
-    public void setSeason(int season) {
-        this.season = season;
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public int getSeasonNumber() {
+        return seasonNumber;
+    }
+
+    public void setSeasonNumber(int seasonNumber) {
+        this.seasonNumber = seasonNumber;
     }
 
     public String getSeasonPoster() {

@@ -263,19 +263,21 @@ public abstract class BaseFragment extends Fragment {
         if (dataRepository == null) return;
         
         // Get unique values from repository and populate spinners
-        List<String> genres = dataRepository.getUniqueGenres();
-        List<String> countries = dataRepository.getUniqueCountries();
-        List<String> years = dataRepository.getUniqueYears();
-        
-        if (genreSpinner != null) {
-            genreSpinner.updateFilterValues(genres);
-        }
-        if (countrySpinner != null) {
-            countrySpinner.updateFilterValues(countries);
-        }
-        if (yearSpinner != null) {
-            yearSpinner.updateFilterValues(years);
-        }
+        dataRepository.getUniqueGenres(result -> {
+            if (genreSpinner != null) {
+                genreSpinner.updateFilterValues(result);
+            }
+        });
+        dataRepository.getUniqueCountries(result -> {
+            if (countrySpinner != null) {
+                countrySpinner.updateFilterValues(result);
+            }
+        });
+        dataRepository.getUniqueYears(result -> {
+            if (yearSpinner != null) {
+                yearSpinner.updateFilterValues(result);
+            }
+        });
     }
     
     protected void dismissAllSpinners() {
@@ -449,9 +451,10 @@ public abstract class BaseFragment extends Fragment {
             
             // Load carousel data if this is the first page and home fragment
             if (currentPage == 0 && carouselAdapter != null && getCategory().isEmpty()) {
-                List<Entry> topRatedEntries = dataRepository.getTopRatedEntries(10);
-                carouselAdapter.setEntries(topRatedEntries);
-                carouselAdapter.notifyDataSetChanged();
+                dataRepository.getTopRatedEntries(10, topRatedEntries -> {
+                    carouselAdapter.setEntries(topRatedEntries);
+                    carouselAdapter.notifyDataSetChanged();
+                });
             }
         });
     }
@@ -471,76 +474,63 @@ public abstract class BaseFragment extends Fragment {
     protected void loadPageDataOld() {
         if (getActivity() == null) return;
         
-        new Thread(() -> {
-            try {
-                List<Entry> allEntries;
-                
-                if (currentSearchQuery.isEmpty()) {
-                    if (currentCategory.isEmpty()) {
-                        allEntries = dataRepository.getAllCachedEntries();
-                    } else {
-                        allEntries = dataRepository.getEntriesByCategory(currentCategory);
-                    }
-                } else {
-                    allEntries = dataRepository.searchByTitle(currentSearchQuery);
-                }
-                
-                // Calculate pagination
-                final int totalItems = allEntries.size();
-                final int startIndex = currentPage * pageSize;
-                final int endIndex = Math.min(startIndex + pageSize, totalItems);
-                
-                final List<Entry> pageEntries = new ArrayList<>();
-                if (startIndex < totalItems) {
-                    pageEntries.addAll(allEntries.subList(startIndex, endIndex));
-                }
-                
-                final boolean hasMore = endIndex < totalItems;
-                
-                // Prepare carousel data if needed
-                final List<Entry> carouselEntries = new ArrayList<>();
-                if (currentPage == 0 && !pageEntries.isEmpty()) {
-                    int carouselSize = Math.min(5, pageEntries.size());
-                    for (int i = 0; i < carouselSize; i++) {
-                        carouselEntries.add(pageEntries.get(i));
-                    }
-                }
-                
-                // Update UI on main thread
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        currentPageEntries.clear();
-                        currentPageEntries.addAll(pageEntries);
-                        if (movieAdapter != null) {
-                            movieAdapter.notifyDataSetChanged();
-                        }
-                        
-                        totalCount = totalItems;
-                        hasMorePages = hasMore;
-                        updatePaginationButtons();
-                        
-                        if (swipeRefreshLayout != null) {
-                            swipeRefreshLayout.setRefreshing(false);
-                        }
-                        
-                        // Load carousel data if this is the first page
-                        if (currentPage == 0 && carouselAdapter != null && !carouselEntries.isEmpty()) {
-                            carouselAdapter.setEntries(carouselEntries);
-                            carouselAdapter.notifyDataSetChanged();
-                        }
-                    });
-                }
-            } catch (Exception e) {
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        if (swipeRefreshLayout != null) {
-                            swipeRefreshLayout.setRefreshing(false);
-                        }
-                        Toast.makeText(getContext(), "Error loading data: " + e.getMessage(), Toast.LENGTH_SHORT).show();
-                    });
+        DataRepository.Callback<List<Entry>> callback = allEntries -> {
+            // Calculate pagination
+            final int totalItems = allEntries.size();
+            final int startIndex = currentPage * pageSize;
+            final int endIndex = Math.min(startIndex + pageSize, totalItems);
+
+            final List<Entry> pageEntries = new ArrayList<>();
+            if (startIndex < totalItems) {
+                pageEntries.addAll(allEntries.subList(startIndex, endIndex));
+            }
+
+            final boolean hasMore = endIndex < totalItems;
+
+            // Prepare carousel data if needed
+            final List<Entry> carouselEntries = new ArrayList<>();
+            if (currentPage == 0 && !pageEntries.isEmpty()) {
+                int carouselSize = Math.min(5, pageEntries.size());
+                for (int i = 0; i < carouselSize; i++) {
+                    carouselEntries.add(pageEntries.get(i));
                 }
             }
-        }).start();
+
+            // Update UI on main thread
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(() -> {
+                    currentPageEntries.clear();
+                    currentPageEntries.addAll(pageEntries);
+                    if (movieAdapter != null) {
+                        movieAdapter.notifyDataSetChanged();
+                    }
+
+                    totalCount = totalItems;
+                    hasMorePages = hasMore;
+                    updatePaginationButtons();
+
+                    if (swipeRefreshLayout != null) {
+                        swipeRefreshLayout.setRefreshing(false);
+                    }
+
+                    // Load carousel data if this is the first page
+                    if (currentPage == 0 && carouselAdapter != null && !carouselEntries.isEmpty()) {
+                        carouselAdapter.setEntries(carouselEntries);
+                        carouselAdapter.notifyDataSetChanged();
+                    }
+                });
+            }
+        };
+
+        if (currentSearchQuery.isEmpty()) {
+            if (currentCategory.isEmpty()) {
+                dataRepository.getAllCachedEntries(callback);
+            } else {
+                dataRepository.getEntriesByCategory(currentCategory, callback);
+            }
+        } else {
+            dataRepository.searchByTitle(currentSearchQuery, callback);
+        }
     }
 
     protected void updatePaginationUI() {
@@ -574,23 +564,25 @@ public abstract class BaseFragment extends Fragment {
 
     private void triggerBackgroundRefreshIfNeeded() {
         if (dataRepository == null) return;
-        final int beforeCount = dataRepository.getTotalEntriesCount();
-        dataRepository.forceRefreshData(new DataRepository.DataCallback() {
-            @Override
-            public void onSuccess(List<Entry> entries) {
-                int afterCount = dataRepository.getTotalEntriesCount();
-                if (afterCount != beforeCount && getActivity() != null) {
-                    getActivity().runOnUiThread(() -> {
-                        currentPage = 0;
-                        loadPageData();
+        dataRepository.getTotalEntriesCount(beforeCount -> {
+            dataRepository.forceRefreshData(new DataRepository.DataCallback() {
+                @Override
+                public void onSuccess(List<Entry> entries) {
+                    dataRepository.getTotalEntriesCount(afterCount -> {
+                        if (afterCount != beforeCount && getActivity() != null) {
+                            getActivity().runOnUiThread(() -> {
+                                currentPage = 0;
+                                loadPageData();
+                            });
+                        }
                     });
                 }
-            }
 
-            @Override
-            public void onError(String error) {
-                // Silent fail; keep cached data
-            }
+                @Override
+                public void onError(String error) {
+                    // Silent fail; keep cached data
+                }
+            });
         });
     }
 }

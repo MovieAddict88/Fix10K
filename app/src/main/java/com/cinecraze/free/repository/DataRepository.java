@@ -404,30 +404,34 @@ public class DataRepository {
     }
 
     public void checkForUpdates(UpdateCheckCallback callback) {
-        apiService.getPlaylistsVersion().enqueue(new Callback<PlaylistsVersion>() {
+        apiService.getPlaylistsVersion().enqueue(new retrofit2.Callback<PlaylistsVersion>() {
             @Override
             public void onResponse(Call<PlaylistsVersion> call, Response<PlaylistsVersion> response) {
                 if (response.isSuccessful() && response.body() != null) {
                     PlaylistsVersion playlistsVersion = response.body();
-                    CacheMetadataEntity metadata = database.cacheMetadataDao().getMetadata(CACHE_KEY_PLAYLIST_VERSION);
-                    int localVersion = metadata != null ? Integer.parseInt(metadata.getDataVersion()) : -1;
+                    databaseExecutor.execute(() -> {
+                        CacheMetadataEntity metadata = database.cacheMetadataDao().getMetadata(CACHE_KEY_PLAYLIST_VERSION);
+                        int localVersion = metadata != null ? Integer.parseInt(metadata.getDataVersion()) : -1;
 
-                    if (playlistsVersion.getVersion() > localVersion) {
-                        callback.onUpdateAvailable(playlistsVersion);
-                    } else {
-                        Log.d(TAG, "No new version found. Using cached data.");
-                        callback.onNoUpdate();
-                    }
+                        mainHandler.post(() -> {
+                            if (playlistsVersion.getVersion() > localVersion) {
+                                callback.onUpdateAvailable(playlistsVersion);
+                            } else {
+                                Log.d(TAG, "No new version found. Using cached data.");
+                                callback.onNoUpdate();
+                            }
+                        });
+                    });
                 } else {
                     Log.e(TAG, "Failed to fetch playlist version: " + response.code());
-                    callback.onError("Failed to fetch playlist version: " + response.code());
+                    mainHandler.post(() -> callback.onError("Failed to fetch playlist version: " + response.code()));
                 }
             }
 
             @Override
             public void onFailure(Call<PlaylistsVersion> call, Throwable t) {
                 Log.e(TAG, "Failed to fetch playlist version", t);
-                callback.onError("Failed to fetch playlist version: " + t.getMessage());
+                mainHandler.post(() -> callback.onError("Failed to fetch playlist version: " + t.getMessage()));
             }
         });
     }
@@ -439,7 +443,7 @@ public class DataRepository {
         AtomicInteger failedCount = new AtomicInteger(0);
 
         for (String url : playlistUrls) {
-            apiService.getPlaylist(url).enqueue(new Callback<Playlist>() {
+            apiService.getPlaylist(url).enqueue(new retrofit2.Callback<Playlist>() {
                 @Override
                 public void onResponse(Call<Playlist> call, Response<Playlist> response) {
                     if (response.isSuccessful() && response.body() != null) {
