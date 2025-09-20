@@ -16,10 +16,7 @@ public interface EpisodeDao {
     void insert(EpisodeEntity episode);
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    long insertAndGetId(EpisodeEntity episode);
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insertAll(EpisodeEntity... episodes);
+    void insertAll(List<EpisodeEntity> episodes);
 
     @Query("DELETE FROM episodes")
     void deleteAll();

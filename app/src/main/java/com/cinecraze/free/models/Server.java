@@ -73,4 +73,11 @@ public class Server {
     public boolean hasNonDrmLicense() {
         return hasLicense() && !isDrmProtected();
     }
+
+    public int getId() {
+        if (url == null) {
+            return 0;
+        }
+        return url.hashCode();
+    }
 }

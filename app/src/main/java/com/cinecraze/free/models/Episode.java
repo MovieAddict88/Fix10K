@@ -93,4 +93,8 @@ public class Episode {
     public void setServers(List<Server> servers) {
         this.servers = servers;
     }
+
+    public int getId(int seasonId) {
+        return (seasonId + getEpisodeString()).hashCode();
+    }
 }

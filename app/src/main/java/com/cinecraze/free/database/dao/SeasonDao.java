@@ -16,10 +16,7 @@ public interface SeasonDao {
     void insert(SeasonEntity season);
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    long insertAndGetId(SeasonEntity season);
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insertAll(SeasonEntity... seasons);
+    void insertAll(List<SeasonEntity> seasons);
 
     @Query("DELETE FROM seasons")
     void deleteAll();

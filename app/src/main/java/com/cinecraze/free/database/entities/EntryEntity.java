@@ -7,7 +7,7 @@ import androidx.room.ColumnInfo;
 @Entity(tableName = "entries")
 public class EntryEntity {
     
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     private int id;
     
     @ColumnInfo(name = "title")

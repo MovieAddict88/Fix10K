@@ -18,7 +18,7 @@ import androidx.room.ColumnInfo;
         })
 public class ServerEntity {
 
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     private int id;
 
     @ColumnInfo(name = "name")

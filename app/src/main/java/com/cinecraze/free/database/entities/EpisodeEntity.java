@@ -12,7 +12,7 @@ import androidx.room.ColumnInfo;
                                   onDelete = ForeignKey.CASCADE))
 public class EpisodeEntity {
 
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     private int id;
 
     @ColumnInfo(name = "episode_number")

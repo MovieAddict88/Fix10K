@@ -16,7 +16,7 @@ public interface ServerDao {
     void insert(ServerEntity server);
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    void insertAll(ServerEntity... servers);
+    void insertAll(List<ServerEntity> servers);
 
     @Query("DELETE FROM servers")
     void deleteAll();

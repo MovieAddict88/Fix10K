@@ -19,9 +19,6 @@ public interface EntryDao {
     
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     void insert(EntryEntity entry);
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    long insertAndGetId(EntryEntity entry);
     
     @Transaction
     @Query("SELECT * FROM entries WHERE main_category = :category")

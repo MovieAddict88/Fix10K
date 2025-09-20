@@ -38,4 +38,8 @@ public class Season {
     public void setEpisodes(List<Episode> episodes) {
         this.episodes = episodes;
     }
+
+    public int getId(int entryId) {
+        return (entryId + String.valueOf(season)).hashCode();
+    }
 }

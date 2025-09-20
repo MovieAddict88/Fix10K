@@ -12,7 +12,7 @@ import androidx.room.ColumnInfo;
                                   onDelete = ForeignKey.CASCADE))
 public class SeasonEntity {
 
-    @PrimaryKey(autoGenerate = true)
+    @PrimaryKey
     private int id;
 
     @ColumnInfo(name = "season_number")
