@@ -651,71 +651,45 @@ public class DetailsActivity extends AppCompatActivity {
 
         // Use background thread to prevent UI blocking
         new Thread(() -> {
-            try {
-                DataRepository dataRepository = new DataRepository(this);
+            DataRepository dataRepository = new DataRepository(this);
+            final Entry finalEntry = dataRepository.getEntryWithDetails(entryId);
 
-                Log.i(TAG, "Loading full data for large series with ID: " + entryId);
+            // Switch back to UI thread for UI updates
+            runOnUiThread(() -> {
+                try {
+                    if (finalEntry != null && finalEntry.getSeasons() != null && !finalEntry.getSeasons().isEmpty()) {
+                        // Copy the seasons data from the full entry
+                        entry.setSeasons(finalEntry.getSeasons());
+                        Log.i(TAG, "Loaded " + finalEntry.getSeasons().size() + " seasons for large series");
 
-                // Load the complete entry data from the repository
-                List<Entry> allEntries = dataRepository.getAllCachedEntries();
-                Entry foundEntry = null;
+                        // Re-setup TV series components with the loaded data
+                        setupTVSeriesComponents();
 
-                // Find the entry with the matching ID
-                for (Entry fullEntry : allEntries) {
-                    if (fullEntry.getId() == entryId) {
-                        foundEntry = fullEntry;
-                        break;
-                    }
-                }
-
-                final Entry finalEntry = foundEntry;
-
-                // Switch back to UI thread for UI updates
-                runOnUiThread(() -> {
-                    try {
-                        if (finalEntry != null && finalEntry.getSeasons() != null && !finalEntry.getSeasons().isEmpty()) {
-                            // Copy the seasons data from the full entry
-                            entry.setSeasons(finalEntry.getSeasons());
-                            Log.i(TAG, "Loaded " + finalEntry.getSeasons().size() + " seasons for large series");
-
-                            // Re-setup TV series components with the loaded data
-                            setupTVSeriesComponents();
-
-                            // Calculate total episodes for user feedback
-                            int totalEpisodes = 0;
-                            for (Season season : finalEntry.getSeasons()) {
-                                if (season.getEpisodes() != null) {
-                                    totalEpisodes += season.getEpisodes().size();
-                                }
+                        // Calculate total episodes for user feedback
+                        int totalEpisodes = 0;
+                        for (Season season : finalEntry.getSeasons()) {
+                            if (season.getEpisodes() != null) {
+                                totalEpisodes += season.getEpisodes().size();
                             }
-
-                            // Show success message
-                            Toast.makeText(DetailsActivity.this,
-                                "Loaded " + finalEntry.getSeasons().size() + " seasons with " + totalEpisodes + " episodes",
-                                Toast.LENGTH_LONG).show();
-                        } else {
-                            // Fallback to manual creation if loading fails
-                            Log.w(TAG, "Entry not found in cache, using fallback method");
-                            loadFallbackSeasonData(entry, entryId);
                         }
 
-                        showEpisodeLoadingIndicator(false);
-                    } catch (Exception e) {
-                        Log.e(TAG, "Error processing loaded entry data: " + e.getMessage(), e);
-                        showEpisodeLoadingIndicator(false);
+                        // Show success message
+                        Toast.makeText(DetailsActivity.this,
+                            "Loaded " + finalEntry.getSeasons().size() + " seasons with " + totalEpisodes + " episodes",
+                            Toast.LENGTH_LONG).show();
+                    } else {
+                        // Fallback to manual creation if loading fails
+                        Log.w(TAG, "Entry not found in cache, using fallback method");
                         loadFallbackSeasonData(entry, entryId);
                     }
-                });
 
-            } catch (Exception e) {
-                Log.e(TAG, "Error loading cached entries: " + e.getMessage(), e);
-
-                // Fallback to manual creation on UI thread
-                runOnUiThread(() -> {
+                    showEpisodeLoadingIndicator(false);
+                } catch (Exception e) {
+                    Log.e(TAG, "Error processing loaded entry data: " + e.getMessage(), e);
                     showEpisodeLoadingIndicator(false);
                     loadFallbackSeasonData(entry, entryId);
-                });
-            }
+                }
+            });
         }).start();
     }
 

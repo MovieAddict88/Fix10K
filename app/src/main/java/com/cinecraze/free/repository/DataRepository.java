@@ -6,7 +6,10 @@ import android.util.Log;
 import com.cinecraze.free.database.CineCrazeDatabase;
 import com.cinecraze.free.database.DatabaseUtils;
 import com.cinecraze.free.database.entities.CacheMetadataEntity;
-import com.cinecraze.free.database.entities.EntryEntity;
+import com.cinecraze.free.database.pojos.EntryWithDetails;
+import com.cinecraze.free.database.entities.EpisodeEntity;
+import com.cinecraze.free.database.entities.SeasonEntity;
+import com.cinecraze.free.database.entities.ServerEntity;
 import com.cinecraze.free.models.Category;
 import com.cinecraze.free.models.Entry;
 import com.cinecraze.free.models.Playlist;
@@ -132,7 +135,7 @@ public class DataRepository {
     public void getPaginatedData(int page, int pageSize, PaginatedDataCallback callback) {
         try {
             int offset = page * pageSize;
-            List<EntryEntity> entities = database.entryDao().getEntriesPaged(pageSize, offset);
+            List<EntryWithDetails> entities = database.entryDao().getEntriesWithDetailsPaged(pageSize, offset);
             List<Entry> entries = DatabaseUtils.entitiesToEntries(entities);
             int totalCount = database.entryDao().getEntriesCount();
             boolean hasMorePages = (offset + pageSize) < totalCount;
@@ -151,7 +154,7 @@ public class DataRepository {
     public void getPaginatedDataByCategory(String category, int page, int pageSize, PaginatedDataCallback callback) {
         try {
             int offset = page * pageSize;
-            List<EntryEntity> entities = database.entryDao().getEntriesByCategoryPaged(category, pageSize, offset);
+            List<EntryWithDetails> entities = database.entryDao().getEntriesWithDetailsByCategoryPaged(category, pageSize, offset);
             List<Entry> entries = DatabaseUtils.entitiesToEntries(entities);
             int totalCount = database.entryDao().getEntriesCountByCategory(category);
             boolean hasMorePages = (offset + pageSize) < totalCount;
@@ -170,7 +173,7 @@ public class DataRepository {
     public void searchPaginated(String searchQuery, int page, int pageSize, PaginatedDataCallback callback) {
         try {
             int offset = page * pageSize;
-            List<EntryEntity> entities = database.entryDao().searchByTitlePaged(searchQuery, pageSize, offset);
+            List<EntryWithDetails> entities = database.entryDao().searchWithDetailsByTitlePaged(searchQuery, pageSize, offset);
             List<Entry> entries = DatabaseUtils.entitiesToEntries(entities);
             int totalCount = database.entryDao().getSearchResultsCount(searchQuery);
             boolean hasMorePages = (offset + pageSize) < totalCount;
@@ -195,7 +198,7 @@ public class DataRepository {
      * Get entries by category from cache
      */
     public List<Entry> getEntriesByCategory(String category) {
-        List<EntryEntity> entities = database.entryDao().getEntriesByCategory(category);
+        List<EntryWithDetails> entities = database.entryDao().getEntriesWithDetailsByCategory(category);
         return DatabaseUtils.entitiesToEntries(entities);
     }
 
@@ -203,7 +206,7 @@ public class DataRepository {
      * Search entries by title from cache
      */
     public List<Entry> searchByTitle(String title) {
-        List<EntryEntity> entities = database.entryDao().searchByTitle(title);
+        List<EntryWithDetails> entities = database.entryDao().searchWithDetailsByTitle(title);
         return DatabaseUtils.entitiesToEntries(entities);
     }
 
@@ -211,8 +214,16 @@ public class DataRepository {
      * Get all cached entries
      */
     public List<Entry> getAllCachedEntries() {
-        List<EntryEntity> entities = database.entryDao().getAllEntries();
+        List<EntryWithDetails> entities = database.entryDao().getAllEntriesWithDetails();
         return DatabaseUtils.entitiesToEntries(entities);
+    }
+
+    public Entry getEntryWithDetails(int entryId) {
+        EntryWithDetails entryWithDetails = database.entryDao().getEntryWithDetails(entryId);
+        if (entryWithDetails != null) {
+            return DatabaseUtils.entityToEntry(entryWithDetails);
+        }
+        return null;
     }
 
     /**
@@ -288,7 +299,7 @@ public class DataRepository {
     public void getPaginatedFilteredData(String genre, String country, String year, int page, int pageSize, PaginatedDataCallback callback) {
         try {
             int offset = page * pageSize;
-            List<EntryEntity> entities = database.entryDao().getEntriesFilteredPaged(
+            List<EntryWithDetails> entities = database.entryDao().getEntriesWithDetailsFilteredPaged(
                 genre == null || genre.isEmpty() ? null : genre,
                 country == null || country.isEmpty() ? null : country,
                 year == null || year.isEmpty() ? null : year,
@@ -312,7 +323,7 @@ public class DataRepository {
 
     public List<Entry> getTopRatedEntries(int count) {
         try {
-            List<EntryEntity> entities = database.entryDao().getTopRatedEntries(count);
+            List<EntryWithDetails> entities = database.entryDao().getTopRatedEntriesWithDetails(count);
             return DatabaseUtils.entitiesToEntries(entities);
         } catch (Exception e) {
             Log.e(TAG, "Error getting top rated entries: " + e.getMessage(), e);
@@ -335,7 +346,7 @@ public class DataRepository {
      */
     private void loadFromCache(DataCallback callback) {
         try {
-            List<EntryEntity> entities = database.entryDao().getAllEntries();
+            List<EntryWithDetails> entities = database.entryDao().getAllEntriesWithDetails();
             List<Entry> entries = DatabaseUtils.entitiesToEntries(entities);
 
             if (!entries.isEmpty()) {
@@ -432,10 +443,15 @@ public class DataRepository {
      * Cache the playlist data to local database
      */
     private void cachePlaylists(List<Playlist> playlists, int version) {
-        try {
+        database.runInTransaction(() -> {
+            // Clear existing data
+            database.serverDao().deleteAll();
+            database.episodeDao().deleteAll();
+            database.seasonDao().deleteAll();
             database.entryDao().deleteAll();
+
             Set<Integer> entryIds = new HashSet<>();
-            List<EntryEntity> entitiesToInsert = new ArrayList<>();
+            int entryCount = 0;
 
             for (Playlist playlist : playlists) {
                 if (playlist.getCategories() != null) {
@@ -444,17 +460,63 @@ public class DataRepository {
                             String mainCategory = category.getMainCategory();
                             for (Entry entry : category.getEntries()) {
                                 if (entry != null && entryIds.add(entry.getId())) {
-                                    EntryEntity entity = DatabaseUtils.entryToEntity(entry, mainCategory);
-                                    entitiesToInsert.add(entity);
+                                    EntryEntity entryEntity = DatabaseUtils.entryToEntity(entry, mainCategory);
+                                    long entryId = database.entryDao().insertAndGetId(entryEntity);
+                                    entryCount++;
+
+                                    // Insert servers for the entry (movie)
+                                    if (entry.getServers() != null) {
+                                        for (com.cinecraze.free.models.Server server : entry.getServers()) {
+                                            ServerEntity serverEntity = new ServerEntity();
+                                            serverEntity.setName(server.getName());
+                                            serverEntity.setUrl(server.getUrl());
+                                            serverEntity.setLicense(server.getLicense());
+                                            serverEntity.setDrm(server.isDrmProtected());
+                                            serverEntity.setEntryId((int) entryId);
+                                            database.serverDao().insert(serverEntity);
+                                        }
+                                    }
+
+                                    // Insert seasons and episodes for the entry (series)
+                                    if (entry.getSeasons() != null) {
+                                        for (com.cinecraze.free.models.Season season : entry.getSeasons()) {
+                                            SeasonEntity seasonEntity = new SeasonEntity();
+                                            seasonEntity.setSeasonNumber(season.getSeason());
+                                            seasonEntity.setSeasonPoster(season.getSeasonPoster());
+                                            seasonEntity.setEntryId((int) entryId);
+                                            long seasonId = database.seasonDao().insertAndGetId(seasonEntity);
+
+                                            if (season.getEpisodes() != null) {
+                                                for (com.cinecraze.free.models.Episode episode : season.getEpisodes()) {
+                                                    EpisodeEntity episodeEntity = new EpisodeEntity();
+                                                    episodeEntity.setEpisodeNumber(episode.getEpisode());
+                                                    episodeEntity.setTitle(episode.getTitle());
+                                                    episodeEntity.setDuration(episode.getDuration());
+                                                    episodeEntity.setDescription(episode.getDescription());
+                                                    episodeEntity.setThumbnail(episode.getThumbnail());
+                                                    episodeEntity.setSeasonId((int) seasonId);
+                                                    long episodeId = database.episodeDao().insertAndGetId(episodeEntity);
+
+                                                    if (episode.getServers() != null) {
+                                                        for (com.cinecraze.free.models.Server server : episode.getServers()) {
+                                                            ServerEntity serverEntity = new ServerEntity();
+                                                            serverEntity.setName(server.getName());
+                                                            serverEntity.setUrl(server.getUrl());
+                                                            serverEntity.setLicense(server.getLicense());
+                                                            serverEntity.setDrm(server.isDrmProtected());
+                                                            serverEntity.setEpisodeId((int) episodeId);
+                                                            database.serverDao().insert(serverEntity);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
-
-            if (!entitiesToInsert.isEmpty()) {
-                database.entryDao().insertAll(entitiesToInsert);
             }
 
             CacheMetadataEntity metadata = new CacheMetadataEntity(
@@ -464,9 +526,7 @@ public class DataRepository {
             );
             database.cacheMetadataDao().insert(metadata);
 
-            Log.d(TAG, "Data cached successfully: " + entitiesToInsert.size() + " entries");
-        } catch (Exception e) {
-            Log.e(TAG, "Error caching data: " + e.getMessage(), e);
-        }
+            Log.d(TAG, "Data cached successfully: " + entryCount + " entries");
+        });
     }
 }

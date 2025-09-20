@@ -40,15 +40,6 @@ public class EntryEntity {
     @ColumnInfo(name = "main_category")
     private String mainCategory; // To associate with category
     
-    @ColumnInfo(name = "servers_json")
-    private String serversJson; // Store servers as JSON string
-    
-    @ColumnInfo(name = "seasons_json")
-    private String seasonsJson; // Store seasons as JSON string
-    
-    @ColumnInfo(name = "related_json")
-    private String relatedJson; // Store related entries as JSON string
-    
     // Constructor
     public EntryEntity() {}
     
@@ -85,13 +76,4 @@ public class EntryEntity {
     
     public String getMainCategory() { return mainCategory; }
     public void setMainCategory(String mainCategory) { this.mainCategory = mainCategory; }
-    
-    public String getServersJson() { return serversJson; }
-    public void setServersJson(String serversJson) { this.serversJson = serversJson; }
-    
-    public String getSeasonsJson() { return seasonsJson; }
-    public void setSeasonsJson(String seasonsJson) { this.seasonsJson = seasonsJson; }
-    
-    public String getRelatedJson() { return relatedJson; }
-    public void setRelatedJson(String relatedJson) { this.relatedJson = relatedJson; }
 }

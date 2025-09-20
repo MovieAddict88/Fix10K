@@ -1,7 +1,11 @@
 package com.cinecraze.free.database;
 
 import com.cinecraze.free.database.entities.EntryEntity;
+import com.cinecraze.free.database.pojos.EntryWithDetails;
+import com.cinecraze.free.database.pojos.EpisodeWithServers;
+import com.cinecraze.free.database.pojos.SeasonWithEpisodes;
 import com.cinecraze.free.models.Entry;
+import com.cinecraze.free.models.Episode;
 import com.cinecraze.free.models.Server;
 import com.cinecraze.free.models.Season;
 import com.google.gson.Gson;
@@ -32,20 +36,16 @@ public class DatabaseUtils {
         entity.setYear(entry.getYearString());
         entity.setMainCategory(mainCategory);
         
-        // Convert complex objects to JSON strings
-        entity.setServersJson(gson.toJson(entry.getServers()));
-        entity.setSeasonsJson(gson.toJson(entry.getSeasons()));
-        entity.setRelatedJson(gson.toJson(entry.getRelated()));
-        
         return entity;
     }
     
     /**
-     * Convert EntryEntity database entity to Entry API model
+     * Convert EntryWithDetails database POJO to Entry API model
      */
-    public static Entry entityToEntry(EntryEntity entity) {
+    public static Entry entityToEntry(EntryWithDetails entityWithDetails) {
         Entry entry = new Entry();
-        
+        EntryEntity entity = entityWithDetails.entry;
+
         // Use proper setter methods
         entry.setTitle(entity.getTitle());
         entry.setSubCategory(entity.getSubCategory());
@@ -57,37 +57,70 @@ public class DatabaseUtils {
         entry.setRating(entity.getRating());
         entry.setDuration(entity.getDuration());
         entry.setYear(entity.getYear());
-        
-        // Convert JSON strings back to objects
-        try {
-            Type serverListType = new TypeToken<List<Server>>(){}.getType();
-            List<Server> servers = gson.fromJson(entity.getServersJson(), serverListType);
-            entry.setServers(servers);
-            
-            Type seasonListType = new TypeToken<List<Season>>(){}.getType();
-            List<Season> seasons = gson.fromJson(entity.getSeasonsJson(), seasonListType);
-            entry.setSeasons(seasons);
-            
-            Type entryListType = new TypeToken<List<Entry>>(){}.getType();
-            List<Entry> related = gson.fromJson(entity.getRelatedJson(), entryListType);
-            entry.setRelated(related);
-        } catch (Exception e) {
-            // Handle JSON parsing errors gracefully
-            entry.setServers(new ArrayList<>());
-            entry.setSeasons(new ArrayList<>());
-            entry.setRelated(new ArrayList<>());
+
+        // Convert related entities
+        List<Server> servers = new ArrayList<>();
+        if (entityWithDetails.servers != null) {
+            for (com.cinecraze.free.database.entities.ServerEntity serverEntity : entityWithDetails.servers) {
+                Server server = new Server();
+                server.setName(serverEntity.getName());
+                server.setUrl(serverEntity.getUrl());
+                server.setLicense(serverEntity.getLicense());
+                server.setDrm(serverEntity.isDrm());
+                servers.add(server);
+            }
         }
-        
+        entry.setServers(servers);
+
+        List<Season> seasons = new ArrayList<>();
+        if (entityWithDetails.seasons != null) {
+            for (SeasonWithEpisodes seasonWithEpisodes : entityWithDetails.seasons) {
+                Season season = new Season();
+                season.setSeason(seasonWithEpisodes.season.getSeasonNumber());
+                season.setSeasonPoster(seasonWithEpisodes.season.getSeasonPoster());
+
+                List<Episode> episodes = new ArrayList<>();
+                if (seasonWithEpisodes.episodes != null) {
+                    for (EpisodeWithServers episodeWithServers : seasonWithEpisodes.episodes) {
+                        Episode episode = new Episode();
+                        episode.setEpisode(episodeWithServers.episode.getEpisodeNumber());
+                        episode.setTitle(episodeWithServers.episode.getTitle());
+                        episode.setDuration(episodeWithServers.episode.getDuration());
+                        episode.setDescription(episodeWithServers.episode.getDescription());
+                        episode.setThumbnail(episodeWithServers.episode.getThumbnail());
+
+                        List<Server> episodeServers = new ArrayList<>();
+                        if (episodeWithServers.servers != null) {
+                            for (com.cinecraze.free.database.entities.ServerEntity serverEntity : episodeWithServers.servers) {
+                                Server server = new Server();
+                                server.setName(serverEntity.getName());
+                                server.setUrl(serverEntity.getUrl());
+                                server.setLicense(serverEntity.getLicense());
+                                server.setDrm(serverEntity.isDrm());
+                                episodeServers.add(server);
+                            }
+                        }
+                        episode.setServers(episodeServers);
+                        episodes.add(episode);
+                    }
+                }
+                season.setEpisodes(episodes);
+                seasons.add(season);
+            }
+        }
+        entry.setSeasons(seasons);
+        entry.setRelated(new ArrayList<>()); // Related entries are not handled in this version
+
         return entry;
     }
-    
+
     /**
-     * Convert list of EntryEntity to list of Entry
+     * Convert list of EntryWithDetails to list of Entry
      */
-    public static List<Entry> entitiesToEntries(List<EntryEntity> entities) {
+    public static List<Entry> entitiesToEntries(List<EntryWithDetails> entitiesWithDetails) {
         List<Entry> entries = new ArrayList<>();
-        for (EntryEntity entity : entities) {
-            entries.add(entityToEntry(entity));
+        for (EntryWithDetails entityWithDetails : entitiesWithDetails) {
+            entries.add(entityToEntry(entityWithDetails));
         }
         return entries;
     }
