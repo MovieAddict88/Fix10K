@@ -4,6 +4,8 @@ import androidx.room.Dao;
 import androidx.room.Insert;
 import com.cinecraze.free.database.entities.SeasonEntity;
 
+import java.util.List;
+
 import androidx.room.Insert;
 import androidx.room.OnConflictStrategy;
 import androidx.room.Query;
