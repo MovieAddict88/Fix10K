@@ -215,7 +215,7 @@ public class DataRepository {
      * Get all cached entries
      */
     public List<Entry> getAllCachedEntries() {
-        List<EntryWithDetails> entities = database.entryDao().getAllEntriesWithDetails();
+        List<EntryWithDetails> entities = database.entryDao().getEntriesWithDetails();
         return DatabaseUtils.entitiesToEntries(entities);
     }
 
@@ -347,7 +347,7 @@ public class DataRepository {
      */
     private void loadFromCache(DataCallback callback) {
         try {
-            List<EntryWithDetails> entities = database.entryDao().getAllEntriesWithDetails();
+            List<EntryWithDetails> entities = database.entryDao().getEntriesWithDetails();
             List<Entry> entries = DatabaseUtils.entitiesToEntries(entities);
 
             if (!entries.isEmpty()) {
