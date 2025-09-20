@@ -24,10 +24,6 @@ public interface EntryDao {
     long insertAndGetId(EntryEntity entry);
     
     @Transaction
-    @Query("SELECT * FROM entries")
-    List<EntryWithDetails> getAllEntriesWithDetails();
-    
-    @Transaction
     @Query("SELECT * FROM entries WHERE main_category = :category")
     List<EntryWithDetails> getEntriesWithDetailsByCategory(String category);
     
@@ -63,9 +59,6 @@ public interface EntryDao {
     @Query("SELECT COUNT(*) FROM entries WHERE title LIKE '%' || :title || '%'")
     int getSearchResultsCount(String title);
     
-    @Query("SELECT * FROM entries WHERE id = :id")
-    EntryWithDetails getEntryWithDetails(int id);
-
     // Filter queries for unique values
     @Query("SELECT DISTINCT sub_category FROM entries WHERE sub_category IS NOT NULL AND sub_category != '' ORDER BY sub_category ASC")
     List<String> getUniqueGenres();

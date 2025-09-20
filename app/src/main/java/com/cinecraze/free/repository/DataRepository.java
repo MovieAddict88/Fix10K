@@ -6,6 +6,7 @@ import android.util.Log;
 import com.cinecraze.free.database.CineCrazeDatabase;
 import com.cinecraze.free.database.DatabaseUtils;
 import com.cinecraze.free.database.entities.CacheMetadataEntity;
+import com.cinecraze.free.database.entities.EntryEntity;
 import com.cinecraze.free.database.pojos.EntryWithDetails;
 import com.cinecraze.free.database.entities.EpisodeEntity;
 import com.cinecraze.free.database.entities.SeasonEntity;
